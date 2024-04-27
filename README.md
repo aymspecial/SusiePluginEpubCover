@@ -17,7 +17,11 @@ FenrirFS で使用する場合は EpubCover.spi を
 
 にコピーし、FenrirFS を再起動することで epub 書籍ファイルのサムネイルを表示します。
 ## Features
+<<<<<<< HEAD
 ・対応する拡張子は epub です。<br/>
+=======
+・対応する拡張子は epub です。
+>>>>>>> 739e40dc66be2f640036c56e3ec4c6c6871e20a0
 ・対応する epub 内部の画像ファイルの拡張子は png, jpg, jpeg, gif, tiff です。
 ・内部画像ファイルの中から一番トップのファイルを GetPicture で返す作りとなっています。
 
