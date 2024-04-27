@@ -1,0 +1,22 @@
+.git/
+.vs/
+*.opensdf
+obj/
+bin/
+Debug/
+Release/
+ipch/
+x64/
+x86/
+Debug MD/
+Debug MT/
+*.obj
+*.sdf
+*.suo
+*.user
+*.aps
+*.tlog
+*.log
+*.bak
+*.aps
+garbage/
