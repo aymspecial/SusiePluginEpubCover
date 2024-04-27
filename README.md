@@ -31,6 +31,6 @@ FenrirFS で使用する場合は EpubCover.spi を
 ## Author
 Kax Aym (aymspecial@msn.com)
 
-## Licence
-GPL v2.0
+## License
+MIT License を採用します。
 改変改善する場合は Pull Request を当方 (aymspecial@msn.com) に頂けると非常に助かりますが、あくまでも希望です。
