@@ -4,7 +4,7 @@
 Epub 書籍ファイルの内部にある'一番最初の'画像ファイルを表示する Susie プラグインです。
 
 ## Motivations
-フリーソフト FenrirFS (https://www.fenrir-inc.com/jp/fenrirfs/) にて Epub 書籍ファイルのサムネイルを表示するために作成してみました。
+フリーソフト FenrirFS (https://www.fenrir-inc.com/jp/fenrirfs/) にて Epub 書籍ファイルのサムネイルを表示するために作成しました。
 
 ## Requirement
 製作環境：OS:Windows 11 Pro 23H2、FenrirFS v2.7.2、Visual Studio 2022 Community Edition 17.9.6 (Win32,x86)
