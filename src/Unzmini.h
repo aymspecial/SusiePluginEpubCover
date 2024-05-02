@@ -22,13 +22,18 @@ class Unzmini
 private:
 	char zipFile[ MAX_PATH ] { 0 };
 	char thumbFile[ MAX_PATH ] { 0 };
+
 public:
 	Unzmini( const char* _zipFile )
 	{
 		strcpy_s( zipFile, _zipFile );
 	};
 
-	int GetTopImageName();
+	int GetCoverImageName();
 	int GetBitmap( HANDLE* pHBInfo, HANDLE* pHBm );
+
+private:
+	int getCoverNameFromOpf();
+	int getTopNamedImageName();
 };
 

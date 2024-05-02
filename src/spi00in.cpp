@@ -49,7 +49,7 @@ int __stdcall GetPicture(
 	auto unz = new Unzmini( buf );
 
 	// zip 内部の上位ファイル名を取得
-	int ret = unz->GetTopImageName();
+	int ret = unz->GetCoverImageName();
 
 	// 一番上位のファイル名で Zip ファイルを解凍
 	ret = unz->GetBitmap( pHBInfo, pHBm );

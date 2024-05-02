@@ -27,80 +27,6 @@ getExtName( char* extName, char* fileName )
 	}
 }
 
-int
-Unzmini::GetTopImageName()
-{
-	zlib_filefunc64_def ffunc;
-	fill_win32_filefunc64A( &ffunc );
-
-	auto uf = unzOpen2_64( zipFile, &ffunc );
-	if( uf == NULL )
-	{
-		SpiTrace( "Cannot open : %s\n", zipFile );
-		return SPI_FILE_READ_ERROR;
-	}
-	SpiTrace( "%s opened\n", zipFile );
-
-	unz_global_info64 gi;
-	int err;
-
-	err = unzGetGlobalInfo64( uf, &gi );
-	if( err != UNZ_OK )
-	{
-		SpiTrace( "error %d with zipfile in unzGetGlobalInfo \n", err );
-		return SPI_FILE_READ_ERROR;
-	}
-
-	// 一通りファイル一覧を舐めてトップの名前を探す
-	bool bFirst = true;
-	for( int i = 0; i < gi.number_entry; i++ )
-	{
-		char inFileName[ MAX_PATH ];
-
-		unz_file_info64 file_info;
-
-		err = unzGetCurrentFileInfo64( uf, &file_info, inFileName, sizeof( inFileName ), NULL, 0, NULL, 0 );
-		if( err != UNZ_OK )
-		{
-			SpiTrace( "error %d with zipfile in unzGetCurrentFileInfo\n", err );
-			break;
-		}
-
-		char extName[ MAX_PATH ]{ 0 };
-
-		getExtName( extName, inFileName );
-
-		if( !strcmp( extName, "png" ) || !strcmp( extName, "jpg" ) || !strcmp( extName, "jpeg" ) ||
-			!strcmp( extName, "gif" ) || !strcmp( extName, "tiff" ) )
-		{
-			// 最初だけ仮トップとする
-			if( bFirst )
-			{
-				strcpy_s( thumbFile, inFileName );
-				bFirst = false;
-			}
-			else if( strcmp( inFileName, thumbFile ) < 0 )
-			{
-				strcpy_s( thumbFile, inFileName );
-				SpiTrace( "change top:%s\n", thumbFile );
-			}
-		}
-
-		if( ( i + 1 ) < gi.number_entry )
-		{
-			err = unzGoToNextFile( uf );
-			if( err != UNZ_OK )
-			{
-				SpiTrace( "error %d with zipfile in unzGoToNextFile\n", err );
-				break;
-			}
-		}
-	}
-
-	unzClose( uf );
-
-	return SPI_ALL_RIGHT;
-}
 
 int
 do_extract_currentfile( unzFile uf, const int* popt_extract_without_path, char* write_filename,
@@ -234,6 +160,41 @@ do_extract_onefile( unzFile uf, const char* filename, char* tempFileName,
 }
 
 int
+Unzmini::getCoverNameFromOpf()
+{
+	int ret = -1;
+
+	// *.opf ファイル名の取得 'content.opf' が優先
+
+	if( ret == -1 )  // 失敗すればエラーで抜ける
+		return ret;
+
+	// id="cover-image" の ImageName
+	
+	if( ret != -1 )  // 成功すれば成功で抜ける
+		return ret;
+
+	// '<manifest>' -> トップ HTML に含まれる ImageName 
+
+
+	return ret;
+}
+
+int
+Unzmini::GetCoverImageName()
+{
+	int ret = -1;
+
+	ret = getCoverNameFromOpf();
+
+	// Opf を見てもわからなければ最後に画像ファイル名を並べ替えて一番若いのを CoverImage とする
+	if( ret == -1 )
+		ret = getTopNamedImageName();
+
+	return ret;
+}
+
+int
 Unzmini::GetBitmap( HANDLE* pHBInfo, HANDLE* pHBm )
 {
 	zlib_filefunc64_def ffunc;
@@ -269,7 +230,7 @@ Unzmini::GetBitmap( HANDLE* pHBInfo, HANDLE* pHBm )
 	int outWidth = ( width + 3 ) / 4 * 4;
 	pInfo->bmiHeader.biSize = sizeof( BITMAPINFOHEADER );
 	pInfo->bmiHeader.biWidth = outWidth;
-	pInfo->bmiHeader.biHeight = - height;  // top-down image
+	pInfo->bmiHeader.biHeight = -height;  // top-down image
 	pInfo->bmiHeader.biPlanes = 1;
 	pInfo->bmiHeader.biBitCount = 24;     // RGB image
 	pInfo->bmiHeader.biCompression = BI_RGB;
@@ -300,6 +261,80 @@ Unzmini::GetBitmap( HANDLE* pHBInfo, HANDLE* pHBm )
 
 	stbi_image_free( pixels );
 	_unlink( tempFileName );
+
+	return SPI_ALL_RIGHT;
+}
+
+int Unzmini::getTopNamedImageName()
+{
+	zlib_filefunc64_def ffunc;
+	fill_win32_filefunc64A( &ffunc );
+
+	auto uf = unzOpen2_64( zipFile, &ffunc );
+	if( uf == NULL )
+	{
+		SpiTrace( "Cannot open : %s\n", zipFile );
+		return SPI_FILE_READ_ERROR;
+	}
+	SpiTrace( "%s opened\n", zipFile );
+
+	unz_global_info64 gi;
+	int err;
+
+	err = unzGetGlobalInfo64( uf, &gi );
+	if( err != UNZ_OK )
+	{
+		SpiTrace( "error %d with zipfile in unzGetGlobalInfo \n", err );
+		return SPI_FILE_READ_ERROR;
+	}
+
+	// 一通りファイル一覧を舐めてトップの名前を探す
+	bool bFirst = true;
+	for( int i = 0; i < gi.number_entry; i++ )
+	{
+		char inFileName[ MAX_PATH ];
+
+		unz_file_info64 file_info;
+
+		err = unzGetCurrentFileInfo64( uf, &file_info, inFileName, sizeof( inFileName ), NULL, 0, NULL, 0 );
+		if( err != UNZ_OK )
+		{
+			SpiTrace( "error %d with zipfile in unzGetCurrentFileInfo\n", err );
+			break;
+		}
+
+		char extName[ MAX_PATH ]{ 0 };
+
+		getExtName( extName, inFileName );
+
+		if( !strcmp( extName, "png" ) || !strcmp( extName, "jpg" ) || !strcmp( extName, "jpeg" ) ||
+			!strcmp( extName, "gif" ) || !strcmp( extName, "tiff" ) )
+		{
+			// 最初だけ仮トップとする
+			if( bFirst )
+			{
+				strcpy_s( thumbFile, inFileName );
+				bFirst = false;
+			}
+			else if( strcmp( inFileName, thumbFile ) < 0 )
+			{
+				strcpy_s( thumbFile, inFileName );
+				SpiTrace( "change top:%s\n", thumbFile );
+			}
+		}
+
+		if( ( i + 1 ) < gi.number_entry )
+		{
+			err = unzGoToNextFile( uf );
+			if( err != UNZ_OK )
+			{
+				SpiTrace( "error %d with zipfile in unzGoToNextFile\n", err );
+				break;
+			}
+		}
+	}
+
+	unzClose( uf );
 
 	return SPI_ALL_RIGHT;
 }
