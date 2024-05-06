@@ -1,5 +1,6 @@
 #pragma once
 #define _X86_
+#include <xmemory>
 #include <vector>
 #include <string>
 #include <direct.h>
@@ -20,8 +21,8 @@
 class Unzmini
 {
 private:
-	char zipFile[ MAX_PATH ] { 0 };
-	char thumbFile[ MAX_PATH ] { 0 };
+	char zipFile[ MAX_PATH ]{ 0 };
+	char thumbFile[ MAX_PATH ]{ 0 };
 
 public:
 	Unzmini( const char* _zipFile )
@@ -33,6 +34,8 @@ public:
 	int GetBitmap( HANDLE* pHBInfo, HANDLE* pHBm );
 
 private:
+	int extractOpfFile( char* optFile, char* opfPath );
+	int getCoverImageName( char* imageName, char* optFile, char* opfPath );
 	int getCoverNameFromOpf();
 	int getTopNamedImageName();
 };

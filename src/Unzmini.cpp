@@ -42,6 +42,8 @@ do_extract_currentfile( unzFile uf, const int* popt_extract_without_path, char* 
 
 	unz_file_info64 file_info;
 	uLong ratio = 0;
+
+	strcpy( filename_inzip, write_filename );
 	err = unzGetCurrentFileInfo64( uf, &file_info, filename_inzip, sizeof( filename_inzip ), NULL, 0, NULL, 0 );
 
 	if( err != UNZ_OK )
@@ -141,16 +143,18 @@ do_extract_currentfile( unzFile uf, const int* popt_extract_without_path, char* 
 }
 
 int
-do_extract_onefile( unzFile uf, const char* filename, char* tempFileName,
+do_extract_onefile( unzFile uf, const char* inFilename, char* tempFileName,
 	int opt_extract_without_path,
 	int opt_overwrite )
 {
 	int err = UNZ_OK;
-	if( unzLocateFile( uf, filename, CASESENSITIVITY ) != UNZ_OK )
+	if( unzLocateFile( uf, inFilename, CASESENSITIVITY ) != UNZ_OK )
 	{
-		SpiTrace( "file %s not found in the zipfile\n", filename );
+		SpiTrace( "file %s not found in the zipfile\n", inFilename );
 		return 2;
 	}
+
+	strcpy( tempFileName, inFilename );
 
 	if( do_extract_currentfile( uf, &opt_extract_without_path, tempFileName,
 		&opt_overwrite ) == UNZ_OK )
@@ -160,22 +164,175 @@ do_extract_onefile( unzFile uf, const char* filename, char* tempFileName,
 }
 
 int
-Unzmini::getCoverNameFromOpf()
+Unzmini::extractOpfFile( char* opfFile, char* opfPath )
 {
-	int ret = -1;
+	zlib_filefunc64_def ffunc;
+	fill_win32_filefunc64A( &ffunc );
 
-	// *.opf ファイル名の取得 'content.opf' が優先
+	auto uf = unzOpen2_64( zipFile, &ffunc );
+	if( uf == NULL )
+	{
+		SpiTrace( "Cannot open : %s\n", zipFile );
+		return SPI_FILE_READ_ERROR;
+	}
+	SpiTrace( "%s opened\n", zipFile );
 
-	if( ret == -1 )  // 失敗すればエラーで抜ける
-		return ret;
+	unz_global_info64 gi;
+	int err;
 
-	// id="cover-image" の ImageName
-	
-	if( ret != -1 )  // 成功すれば成功で抜ける
-		return ret;
+	err = unzGetGlobalInfo64( uf, &gi );
+	if( err != UNZ_OK )
+	{
+		SpiTrace( "error %d with zipfile in unzGetGlobalInfo \n", err );
+		return SPI_FILE_READ_ERROR;
+	}
+
+	// 一通りファイル一覧を舐める
+	bool bFirst = true;
+	for( int i = 0; i < gi.number_entry; i++ )
+	{
+		char inFileName[ MAX_PATH ];
+
+		unz_file_info64 file_info;
+
+		err = unzGetCurrentFileInfo64( uf, &file_info, inFileName, sizeof( inFileName ), NULL, 0, NULL, 0 );
+		if( err != UNZ_OK )
+		{
+			SpiTrace( "error %d with zipfile in unzGetCurrentFileInfo\n", err );
+			break;
+		}
+
+		char extName[ MAX_PATH ]{ 0 };
+		char tempName[ MAX_PATH ]{ 0 };
+
+		getExtName( extName, inFileName );
+		if( !strcmp( extName, "opf" ) )
+		{
+			auto ret = do_extract_onefile( uf, inFileName, tempName, 1, 1 );
+			if( ret != 0 )
+				return SPI_FILE_READ_ERROR;
+
+			strcpy_s( opfFile, MAX_PATH, tempName );
+
+			// opf のパスを取り出す
+			strcpy( opfPath, inFileName );
+			for( int ip = strlen( opfPath ) - 1; 0 <= ip; ip-- )
+			{
+				if( opfPath[ ip ] == '/' )
+				{
+					opfPath[ ip + 1 ] = '\0';
+					break;
+				}
+				opfPath[ ip ] = '\0';
+			}
+
+			break;
+		}
+
+		if( ( i + 1 ) < gi.number_entry )
+		{
+			err = unzGoToNextFile( uf );
+			if( err != UNZ_OK )
+			{
+				SpiTrace( "error %d with zipfile in unzGoToNextFile\n", err );
+				break;
+			}
+		}
+	}
+
+
+
+	unzClose( uf );
+
+	return SPI_ALL_RIGHT;
+}
+#include "tinyxml2.h"
+using namespace tinyxml2;
+
+int
+Unzmini::getCoverImageName( char* imageName, char* opfFile, char* opfPath )
+{
+	int ret = SPI_NOT_SUPPORT;
+
+	tinyxml2::XMLDocument doc;
+	doc.LoadFile( opfFile );
+	auto error = doc.ErrorID();
+
+	// Trial #1 metadata->meta name="cover" となっている content を探す
+	const char* nameAttr = NULL;
+	const char* coverIdName = NULL;
+	XMLElement* metaElement = doc.FirstChildElement( "package" )->FirstChildElement( "metadata" )->FirstChildElement( "meta" );
+	if( metaElement == NULL )
+		goto TRIAL2;
+
+	do
+	{
+		nameAttr = metaElement->Attribute( "name" );
+		if( nameAttr && !strcmp( nameAttr, "cover" ) )
+		{
+			coverIdName = metaElement->Attribute( "content" );
+			break;
+		}
+		metaElement = metaElement->NextSiblingElement( "meta" );
+	}
+	while( metaElement != NULL );
+
+
+TRIAL2:
+	// Trial #2 package->manifest->item の中で properties="cover-image" となっている href を探す
+	if ( coverIdName == NULL )
+		coverIdName = "cover";
+
+	XMLElement * manifestElement = doc.FirstChildElement( "package" )->FirstChildElement( "manifest" );
+
+	int itemCount = manifestElement->ChildElementCount();
+	XMLElement * itemElem = manifestElement = manifestElement->FirstChildElement( "item" );
+
+	for( int i = 0; i < itemCount; i++ )
+	{
+		auto propAttr = itemElem->Attribute( "properties" );
+		auto idAttr = itemElem->Attribute( "id" );
+		if( ( propAttr && !strcmp( propAttr, coverIdName ) ) ||
+			( idAttr && ( !strcmp( idAttr, coverIdName ) || !strcmp( idAttr, "cover" ) ) ) )
+		{
+			char extName[ MAX_PATH ]{ 0 };
+
+			strcpy( imageName, opfPath );
+			strcat( imageName, itemElem->Attribute( "href" ) );
+
+			getExtName( extName, imageName );
+			if( strcmp( extName, "jpg" ) && strcmp( extName, "jpeg" ) && strcmp( extName, "gif" ) &&
+				strcmp( extName, "png" ) )
+				break;
+
+			return SPI_ALL_RIGHT;
+		}
+		itemElem = itemElem->NextSiblingElement();
+	}
 
 	// '<manifest>' -> トップ HTML に含まれる ImageName 
 
+	return ret;
+}
+
+
+int
+Unzmini::getCoverNameFromOpf()
+{
+	int ret = SPI_NOT_SUPPORT;
+
+	// *.opf ファイル名の取得 'content.opf' が優先
+	char opfFile[ MAX_PATH ]{ 0 };
+	char opfPath[ MAX_PATH ]{ 0 };
+	ret = extractOpfFile( opfFile, opfPath );
+
+	if( ret != SPI_ALL_RIGHT )  // 失敗すればエラーで抜ける
+		return ret;
+
+	ret = getCoverImageName( thumbFile, opfFile, opfPath );
+
+	if( ret != SPI_ALL_RIGHT )  // 成功すれば成功で抜ける
+		return ret;
 
 	return ret;
 }
@@ -185,10 +342,11 @@ Unzmini::GetCoverImageName()
 {
 	int ret = -1;
 
+
 	ret = getCoverNameFromOpf();
 
 	// Opf を見てもわからなければ最後に画像ファイル名を並べ替えて一番若いのを CoverImage とする
-	if( ret == -1 )
+	if( ret != SPI_ALL_RIGHT )
 		ret = getTopNamedImageName();
 
 	return ret;
