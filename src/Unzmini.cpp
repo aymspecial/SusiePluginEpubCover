@@ -1,10 +1,10 @@
-#include "Unzmini.h"
+п»ї#include "Unzmini.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
 void
-getExtName( char* extName, char* fileName )
+getExtName( char* extName, const char* fileName )
 {
 	auto len = strlen( fileName );
 	auto iStart = len - 1;
@@ -158,7 +158,7 @@ do_extract_onefile( unzFile uf, const char* inFilename, char* tempFileName,
 
 	if( do_extract_currentfile( uf, &opt_extract_without_path, tempFileName,
 		&opt_overwrite ) == UNZ_OK )
-		return 0;
+		return SPI_ALL_RIGHT;
 	else
 		return 1;
 }
@@ -187,7 +187,7 @@ Unzmini::extractOpfFile( char* opfFile, char* opfPath )
 		return SPI_FILE_READ_ERROR;
 	}
 
-	// €к’К‚иѓtѓ@ѓCѓ‹€к——‚рдr‚Я‚й
+	// дёЂйЂљг‚Љгѓ•г‚Ўг‚¤гѓ«дёЂи¦§г‚’и€ђг‚Ѓг‚‹
 	bool bFirst = true;
 	for( int i = 0; i < gi.number_entry; i++ )
 	{
@@ -214,7 +214,7 @@ Unzmini::extractOpfFile( char* opfFile, char* opfPath )
 
 			strcpy_s( opfFile, MAX_PATH, tempName );
 
-			// opf ‚МѓpѓX‚рЋж‚иЏo‚·
+			// opf гЃ®гѓ‘г‚№г‚’еЏ–г‚Ље‡єгЃ™
 			strcpy( opfPath, inFileName );
 			for( int ip = strlen( opfPath ) - 1; 0 <= ip; ip-- )
 			{
@@ -240,8 +240,6 @@ Unzmini::extractOpfFile( char* opfFile, char* opfPath )
 		}
 	}
 
-
-
 	unzClose( uf );
 
 	return SPI_ALL_RIGHT;
@@ -258,7 +256,7 @@ Unzmini::getCoverImageName( char* imageName, char* opfFile, char* opfPath )
 	doc.LoadFile( opfFile );
 	auto error = doc.ErrorID();
 
-	// Trial #1 metadata->meta name="cover" ‚Ж‚И‚Б‚Д‚ў‚й content ‚р’T‚·
+	// Trial #1 metadata->meta name="cover" гЃЁгЃЄгЃЈгЃ¦гЃ„г‚‹ content г‚’жЋўгЃ™
 	const char* nameAttr = NULL;
 	const char* coverIdName = NULL;
 	XMLElement* metaElement = doc.FirstChildElement( "package" )->FirstChildElement( "metadata" )->FirstChildElement( "meta" );
@@ -279,21 +277,37 @@ Unzmini::getCoverImageName( char* imageName, char* opfFile, char* opfPath )
 
 
 TRIAL2:
-	// Trial #2 package->manifest->item ‚М’†‚Е properties="cover-image" ‚Ж‚И‚Б‚Д‚ў‚й href ‚р’T‚·
-	if ( coverIdName == NULL )
+	// и¦‹гЃ¤гЃ‹г‚‰гЃЄгЃ„е ґеђ€гЃЇгѓ‡гѓ•г‚©гѓ«гѓ€гЃ® cover г‚’жЋЎз”ЁгЃ™г‚‹
+	if( coverIdName == NULL )
 		coverIdName = "cover";
+	else
+	{
+		// <meta name="cover" content="Images/9780136870418.jpg"/> гЃЁгЃ„гЃ†е ґеђ€гЃЊгЃ‚г‚‹
+		char extName[ MAX_PATH ]{ 0 };
 
-	XMLElement * manifestElement = doc.FirstChildElement( "package" )->FirstChildElement( "manifest" );
+		getExtName( extName, coverIdName );
+		if( !strcmp( extName, "jpg" ) || !strcmp( extName, "jpeg" ) || !strcmp( extName, "gif" ) ||
+			!strcmp( extName, "png" ) )
+		{
+			strcpy( imageName, opfPath );
+			strcat( imageName, coverIdName );
+			return SPI_ALL_RIGHT;
+		}
+	}
+
+	// Trial #2 package->manifest->item гЃ®дё­гЃ§ properties="cover-image" гЃЁгЃЄгЃЈгЃ¦гЃ„г‚‹ href г‚’жЋўгЃ™
+
+	XMLElement* manifestElement = doc.FirstChildElement( "package" )->FirstChildElement( "manifest" );
 
 	int itemCount = manifestElement->ChildElementCount();
-	XMLElement * itemElem = manifestElement = manifestElement->FirstChildElement( "item" );
+	XMLElement* itemElem = manifestElement = manifestElement->FirstChildElement( "item" );
 
 	for( int i = 0; i < itemCount; i++ )
 	{
 		auto propAttr = itemElem->Attribute( "properties" );
 		auto idAttr = itemElem->Attribute( "id" );
 		if( ( propAttr && !strcmp( propAttr, coverIdName ) ) ||
-			( idAttr && ( !strcmp( idAttr, coverIdName ) || !strcmp( idAttr, "cover" ) ) ) )
+			( idAttr && ( !strcmp( idAttr, coverIdName ) ) ) )
 		{
 			char extName[ MAX_PATH ]{ 0 };
 
@@ -301,16 +315,15 @@ TRIAL2:
 			strcat( imageName, itemElem->Attribute( "href" ) );
 
 			getExtName( extName, imageName );
-			if( strcmp( extName, "jpg" ) && strcmp( extName, "jpeg" ) && strcmp( extName, "gif" ) &&
-				strcmp( extName, "png" ) )
-				break;
+			if( !strcmp( extName, "jpg" ) || !strcmp( extName, "jpeg" ) || !strcmp( extName, "gif" ) ||
+				!strcmp( extName, "png" ) )
 
-			return SPI_ALL_RIGHT;
+				return SPI_ALL_RIGHT;
 		}
 		itemElem = itemElem->NextSiblingElement();
 	}
 
-	// '<manifest>' -> ѓgѓbѓv HTML ‚ЙЉЬ‚Ь‚к‚й ImageName 
+	// '<manifest>' -> гѓ€гѓѓгѓ— HTML гЃ«еђ«гЃѕг‚Њг‚‹ ImageName 
 
 	return ret;
 }
@@ -321,17 +334,17 @@ Unzmini::getCoverNameFromOpf()
 {
 	int ret = SPI_NOT_SUPPORT;
 
-	// *.opf ѓtѓ@ѓCѓ‹–ј‚МЋж“ѕ 'content.opf' ‚Є—Dђж
+	// *.opf гѓ•г‚Ўг‚¤гѓ«еђЌгЃ®еЏ–еѕ— 'content.opf' гЃЊе„Єе…€
 	char opfFile[ MAX_PATH ]{ 0 };
 	char opfPath[ MAX_PATH ]{ 0 };
 	ret = extractOpfFile( opfFile, opfPath );
 
-	if( ret != SPI_ALL_RIGHT )  // Ћё”s‚·‚к‚ОѓGѓ‰Ѓ[‚Е”І‚Ї‚й
+	if( ret != SPI_ALL_RIGHT )  // е¤±ж•—гЃ™г‚ЊгЃ°г‚Ёгѓ©гѓјгЃ§жЉњгЃ‘г‚‹
 		return ret;
 
 	ret = getCoverImageName( thumbFile, opfFile, opfPath );
 
-	if( ret != SPI_ALL_RIGHT )  // ђ¬Њч‚·‚к‚Ођ¬Њч‚Е”І‚Ї‚й
+	if( ret != SPI_ALL_RIGHT )  // ж€ђеЉџгЃ™г‚ЊгЃ°ж€ђеЉџгЃ§жЉњгЃ‘г‚‹
 		return ret;
 
 	return ret;
@@ -342,12 +355,13 @@ Unzmini::GetCoverImageName()
 {
 	int ret = -1;
 
-
 	ret = getCoverNameFromOpf();
 
-	// Opf ‚рЊ©‚Д‚а‚н‚©‚з‚И‚Ї‚к‚ОЌЕЊг‚Й‰ж‘њѓtѓ@ѓCѓ‹–ј‚р•А‚Ч‘Ц‚¦‚Д€к”ФЋб‚ў‚М‚р CoverImage ‚Ж‚·‚й
+	// е¤‰гЃЄеђЌе‰ЌгЃ—гЃ‹е‡єгЃ¦гЃ“гЃЄгЃ‹гЃЈгЃџг‚‰гѓ€гѓѓгѓ—гЃ®з”»еѓЏгЃЁгЃ™г‚‹
 	if( ret != SPI_ALL_RIGHT )
+	{
 		ret = getTopNamedImageName();
+	}
 
 	return ret;
 }
@@ -368,6 +382,12 @@ Unzmini::GetBitmap( HANDLE* pHBInfo, HANDLE* pHBm )
 
 	char tempFileName[ MAX_PATH ];
 	auto ret = do_extract_onefile( uf, thumbFile, tempFileName, 1, 1 );
+	// и§Је‡ЌгЃ§гЃЌгЃЄгЃ‹гЃЈгЃџг‚‰пј€гЃќгЃ®еђЌе‰ЌгЃ®гѓ•г‚Ўг‚¤гѓ«гЃЊз„ЎгЃ‹гЃЈгЃџг‚‰пј‰дёЂз•ЄдёЉгЃ®з”»еѓЏгѓ•г‚Ўг‚¤гѓ«г‚’жЋЎз”ЁгЃ™г‚‹
+	if( ret != SPI_ALL_RIGHT )
+	{
+		ret = getTopNamedImageName();
+		ret = do_extract_onefile( uf, thumbFile, tempFileName, 1, 1 );
+	}
 	unzClose( uf );
 
 	unsigned char* pixels;
@@ -375,10 +395,10 @@ Unzmini::GetBitmap( HANDLE* pHBInfo, HANDLE* pHBm )
 	int height;
 	int bpp;
 
-	// ѓtѓ@ѓCѓ‹‚р“З‚ЭЌћ‚ЭЃA‰ж‘њѓfЃ[ѓ^‚рЋж‚иЏo‚·
+	// гѓ•г‚Ўг‚¤гѓ«г‚’иЄ­гЃїиѕјгЃїгЂЃз”»еѓЏгѓ‡гѓјг‚їг‚’еЏ–г‚Ље‡єгЃ™
 	pixels = stbi_load( tempFileName, &width, &height, &bpp, 3 );
 
-	// BMPЏо•с‚МѓZѓbѓg
+	// BMPжѓ…е ±гЃ®г‚»гѓѓгѓ€
 	const DWORD bmpInfoSize = sizeof( BITMAPINFOHEADER );
 	LocalHeap lhInfo;
 	BITMAPINFO* pInfo = reinterpret_cast<BITMAPINFO*>( lhInfo.Alloc( bmpInfoSize ) );
@@ -395,7 +415,7 @@ Unzmini::GetBitmap( HANDLE* pHBInfo, HANDLE* pHBm )
 
 	DWORD imageSize = outWidth * height * 3;
 
-	// ѓCѓЃЃ[ѓW‚М“WЉJ
+	// г‚¤гѓЎгѓјг‚ёгЃ®е±•й–‹
 	LocalHeap lhImage;
 	BYTE* newPixels = reinterpret_cast<BYTE*>( lhImage.Alloc( imageSize ) );
 	if( newPixels == NULL )
@@ -413,8 +433,8 @@ Unzmini::GetBitmap( HANDLE* pHBInfo, HANDLE* pHBm )
 		}
 	}
 
-	// ѓЃѓ‚ѓЉ‚рѓAѓ“ѓЌѓbѓN or ‰р•ъ
-	*pHBInfo = lhInfo.Detach();	// Susie‚Й•Ф‚·ѓnѓ“ѓhѓ‹‚рѓZѓbѓg
+	// гѓЎгѓўгѓЄг‚’г‚ўгѓігѓ­гѓѓг‚Ї or и§Јж”ѕ
+	*pHBInfo = lhInfo.Detach();	// SusieгЃ«иї”гЃ™гѓЏгѓігѓ‰гѓ«г‚’г‚»гѓѓгѓ€
 	*pHBm = lhImage.Detach();
 
 	stbi_image_free( pixels );
@@ -446,7 +466,7 @@ int Unzmini::getTopNamedImageName()
 		return SPI_FILE_READ_ERROR;
 	}
 
-	// €к’К‚иѓtѓ@ѓCѓ‹€к——‚рдr‚Я‚Дѓgѓbѓv‚М–ј‘O‚р’T‚·
+	// дёЂйЂљг‚Љгѓ•г‚Ўг‚¤гѓ«дёЂи¦§г‚’и€ђг‚ЃгЃ¦гѓ€гѓѓгѓ—гЃ®еђЌе‰Ќг‚’жЋўгЃ™
 	bool bFirst = true;
 	for( int i = 0; i < gi.number_entry; i++ )
 	{
@@ -468,7 +488,7 @@ int Unzmini::getTopNamedImageName()
 		if( !strcmp( extName, "png" ) || !strcmp( extName, "jpg" ) || !strcmp( extName, "jpeg" ) ||
 			!strcmp( extName, "gif" ) || !strcmp( extName, "tiff" ) )
 		{
-			// ЌЕЏ‰‚ѕ‚Ї‰јѓgѓbѓv‚Ж‚·‚й
+			// жњЂе€ќгЃ гЃ‘д»®гѓ€гѓѓгѓ—гЃЁгЃ™г‚‹
 			if( bFirst )
 			{
 				strcpy_s( thumbFile, inFileName );

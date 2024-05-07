@@ -1,4 +1,4 @@
-#include <windows.h>
+ï»¿#include <windows.h>
 #include "spi00in.h"
 #include "spimisc.h"
 #include "Unzmini.h"
@@ -48,13 +48,13 @@ int __stdcall GetPicture(
 
 	auto unz = new Unzmini( buf );
 
-	// zip “à•”‚ÌãˆÊƒtƒ@ƒCƒ‹–¼‚ğæ“¾
+	// cover ãƒ•ã‚¡ã‚¤ãƒ«åã‚’å–å¾—
 	int ret = unz->GetCoverImageName();
 
-	// ˆê”ÔãˆÊ‚Ìƒtƒ@ƒCƒ‹–¼‚Å Zip ƒtƒ@ƒCƒ‹‚ğ‰ğ“€
+	// ä¸€ç•ªä¸Šä½ã®ãƒ•ã‚¡ã‚¤ãƒ«åã§ Zip ãƒ•ã‚¡ã‚¤ãƒ«ã‚’è§£å‡
 	ret = unz->GetBitmap( pHBInfo, pHBm );
 
-	//// I—¹ˆ—
+	//// çµ‚äº†å‡¦ç†
 	delete unz;
 	
 	return SPI_ALL_RIGHT;
