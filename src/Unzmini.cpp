@@ -275,25 +275,10 @@ Unzmini::getCoverImageName( char* imageName, char* opfFile, char* opfPath )
 	}
 	while( metaElement != NULL );
 
-
 TRIAL2:
 	// 見つからない場合はデフォルトの cover を採用する
 	if( coverIdName == NULL )
 		coverIdName = "cover";
-	else
-	{
-		// <meta name="cover" content="Images/9780136870418.jpg"/> という場合がある
-		char extName[ MAX_PATH ]{ 0 };
-
-		getExtName( extName, coverIdName );
-		if( !strcmp( extName, "jpg" ) || !strcmp( extName, "jpeg" ) || !strcmp( extName, "gif" ) ||
-			!strcmp( extName, "png" ) )
-		{
-			strcpy( imageName, opfPath );
-			strcat( imageName, coverIdName );
-			return SPI_ALL_RIGHT;
-		}
-	}
 
 	// Trial #2 package->manifest->item の中で properties="cover-image" となっている href を探す
 
